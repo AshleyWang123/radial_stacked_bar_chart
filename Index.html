@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" charset=UTF-8">
+    <title>Labour market by age group</title>
+</head>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background-image: url("bg.png");
+        background-size: inherit;
+    }
+    svg{
+        position: absolute;
+        left: -20%;
+        top: -15%;
+    }
+    div{
+       display: block;
+        text-align: center;
+        align-items: center;
+    }
+    #rotate{
+        position: absolute;
+        z-index: 10;
+        left:38%;
+        top:160%;
+        font-size: 36px;
+        color: white;
+    }
+    input{
+        width: 500px;
+    }
+    #b1{
+        height: 250px;
+        position: absolute;
+        left: 41%;
+        top: 80%;
+    }
+    #b2{
+        height: 200px;
+        position: absolute;
+        left: 48%;
+        top: 120%;
+    }
+    #Button{
+        position: absolute;
+        left: 49%;
+        top: 180%;
+    }
+    #women,#men,#both{
+        color: #fff;
+        text-transform: uppercase;
+        text-decoration: none;
+        background: #92642a;
+        padding: 20px;
+        border-radius: 50px;
+        display: inline-block;
+        border: none;
+        transition: all 0.4s ease 0s;
+        font-weight: bold;
+    }
+    #women:hover,#men:hover,#both:hover {
+        text-shadow: 0px 0px 6px rgba(255, 255, 255, 1);
+        -webkit-box-shadow: 0px 5px 40px -10px rgba(0,0,0,0);
+        -moz-box-shadow: 0px 5px 40px -10px rgba(0,0,0,0);
+        transition: all 0.4s ease 0s;
+    }
+</style>
+<body>
+
+<div>
+        <label id="rotate" for="nAngle">
+            Rotate = <span id="nAngle-value">…</span>
+        <input type="range" min="0" max="360" id="nAngle">
+        </label>
+<svg width="1800" height="1800">
+</svg>
+</div>
+<div>
+  <img id="b1" src="b1.png">
+  <img id="b2" src="b2.png">
+</div>
+<div id="Button">
+    <button id="both">Both</button>
+    <button id="women">Only women</button>
+    <button id="men">Only men</button>
+</div>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+    var svg = d3.select("svg"),
+        width = +svg.attr("width"),
+        height = +svg.attr("height"),
+        innerRadius = 600,
+        outerRadius = Math.min(width, height)/2,
+        g = svg.append("g").attr("transform", "translate(" + width* 0.5  + "," + height* 0.5 + ")");
+
+    var x = d3.scaleBand()
+        .range([0, 2 * Math.PI])
+        .align(0);
+
+    var y = d3.scaleLinear()
+        .range([innerRadius, outerRadius]);
+
+    change("Both.csv");
+
+    function change(data) {
+        if (data=="Both.csv"){
+            var z = d3.scaleOrdinal()
+                .range(["#ff9a00","#fff400","#ffdb00", "#ecbb45","#d2801a","#92642a"]);
+        }else if (data=="Women.csv") {
+            var z = d3.scaleOrdinal()
+                .range(["#9cdcec","#9cb4ec","#ac9cec", "#d49cec","#ec9cdc","#c094a0"]);
+        }else {
+            var z = d3.scaleOrdinal()
+                .range(["#497374","#95baa7","#bdb298", "#3a766e","#093c21","#537d6a"]);
+        }
+        d3.csv(data, function (d, i, columns) {
+            for (i = 1, t = 0; i < columns.length; ++i) t += d[columns[i]] = +d[columns[i]];
+            d.total = t;
+            return d;
+        }, function (error, data) {
+            if (error) throw error;
+            weave(data, function (a, b) {
+                return b[data.columns[6]] - a[data.columns[6]];
+            });
+            x.domain(data.map(function (d) {
+                return d.DATE;
+            }));
+            y.domain([0, d3.max(data, function (d) {
+                return d.total;
+            })]);
+            z.domain(data.columns.slice(1));
+
+            //tooltip-move mouse
+            var tooltip = d3.select("body")
+                .append("div")
+                .attr("id", "tooltip")
+                .style("position", "absolute")
+                .style("z-index", "10")
+                .style("opacity", 0);
+
+
+            function mouseover(d) {
+                d3.select(this).attr("stroke", "white")
+
+                tooltip.html("<b>Employment Level: " + d[1] + "</b>");
+                return tooltip.transition()
+                    .duration("50")
+                    .style("opacity", 0.9)
+                    .style("color", "#92642a")
+                    .style("background", "white")
+            }
+
+            function mouseout() {
+                d3.select(this).attr("stroke", "")
+                return tooltip.style("opacity", 0);
+            }
+
+            function mousemove() {
+                return tooltip
+                    .style("top", (d3.event.pageY - 10) + "px")
+                    .style("left", (d3.event.pageX + 10) + "px");
+            }
+
+            //add data-stacked bar
+            g.append("g")
+                .selectAll("g")
+                .data(d3.stack().keys(data.columns.slice(1))(data))
+                .enter().append("g")
+                .attr("fill", function (d) {
+                    return z(d.key);
+                })
+                .selectAll("path")
+                .data(function (d) {
+                    return d;
+                })
+                .enter()
+                .append("path")
+                .attr("d", d3.arc()
+                    .innerRadius(function (d) {
+                        return y(d[0]);
+                    })
+                    .outerRadius(function (d) {
+                        return y(d[1]);
+                    })
+                    .startAngle(function (d) {
+                        return x(d.data.DATE);
+                    })
+                    .endAngle(function (d) {
+                        return x(d.data.DATE) + x.bandwidth();
+                    })
+                    .padAngle(0.01)
+                    .padRadius(innerRadius))
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseout", mouseout)
+
+            //add label
+            var label = g.append("g")
+                .selectAll("g")
+                .data(data)
+                .enter().append("g")
+                .attr("text-anchor", "middle")
+                .attr("transform", function (d) {
+                    return "rotate(" + ((x(d.DATE) + x.bandwidth() / 2) * 180 / Math.PI) + ")translate(" + innerRadius + ",4)";
+                });
+
+
+            label.append("text")
+                .attr("transform", "rotate(180)translate(45,0)")
+                .text(function (d) {
+                    return d.DATE;
+                })
+                .attr("fill", "white")
+                .style("font-size", "12px");
+        });
+}
+
+    function weave(array, compare) {
+        array=array.slice().sort((a, b) => d3.ascending(a.DATE, b.DATE))
+        var i = -1, j, n = array.sort(compare).length, weave = new Array(n);
+        while (++i < n) weave[i] = array[(j = i << 1) >= n ? (n - i << 1) - 1 : j];
+        while (--n >= 0) array[n] = weave[n];
+    }
+
+    var holder = d3.select("body");
+
+    // when the input range changes update the angle
+    d3.select("#nAngle").on("input", function() {
+        update(+this.value);
+    });
+
+    // Initial starting angle of the svg
+    update(0);
+
+    // update the element
+    function update(nAngle) {
+        // adjust the text on the range slider
+        d3.select("#nAngle-value").text(nAngle);
+        d3.select("#nAngle").property("value", nAngle);
+
+        // rotate the svg
+        holder.select("svg")
+            .attr("transform", "translate(300,150) rotate("+nAngle+")");
+    }
+    d3.select("button#both")
+        .on("click", function () {
+            var g = d3.select("g");
+            g.selectAll("*").remove();
+            change("Employment.csv");
+        });
+    d3.select("button#women")
+        .on("click", function () {
+            var g = d3.select("g");
+            g.selectAll("*").remove();
+            change("Women.csv")
+        });
+    d3.select("button#men")
+        .on("click", function () {
+            var g = d3.select("g");
+            g.selectAll("*").remove();
+            change("Men.csv")
+        });
+</script>
+</body>
+</html>
